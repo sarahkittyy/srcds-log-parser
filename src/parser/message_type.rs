@@ -48,13 +48,10 @@ pub enum MessageType {
         user: User,
         team: String,
     },
-    Domination {
+    InterPlayerAction {
         from: User,
-        to: User,
-    },
-    Revenge {
-        from: User,
-        to: User,
+        action: String,
+        against: User,
     },
     Unknown,
 }

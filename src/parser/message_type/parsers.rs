@@ -1,9 +1,5 @@
 use super::{MessageType, User};
-use nom::{
-    branch::{alt, Alt},
-    error::{make_error, ErrorKind},
-    Err,
-};
+use nom::{branch::Alt, Err};
 use regex::Regex;
 
 #[allow(unused_imports)]
@@ -21,10 +17,6 @@ use nom::{
 };
 use std::net::Ipv4Addr;
 
-fn custom_err<'a>(i: &str) -> nom::Err<nom::error::Error<&str>> {
-    nom::Err::Error(nom::error::Error::new(i, ErrorKind::Digit))
-}
-
 pub fn get_message_type(i: &str) -> IResult<&str, MessageType> {
     log_file_started
         .or(log_file_closed)
@@ -36,7 +28,7 @@ pub fn get_message_type(i: &str) -> IResult<&str, MessageType> {
         .or(chat_message)
         .or(connect_message)
         .or(disconnect_message)
-        .or(vengeance_message)
+        .or(inter_player_action)
         .or(join_team_msg)
         .parse(i)
 }
@@ -135,15 +127,21 @@ fn join_team_msg(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn vengeance_message(i: &str) -> IResult<&str, MessageType> {
+fn inter_player_action(i: &str) -> IResult<&str, MessageType> {
     let (i, from) = user(i)?;
-    if let Ok((i2, (_, to))) = (tag(" triggered \"domination\" against "), user).parse(i) {
-        Ok((i2, MessageType::Domination { from, to }))
-    } else if let Ok((i2, (_, to))) = (tag(" triggered \"revenge\" against "), user).parse(i) {
-        Ok((i2, MessageType::Revenge { from, to }))
-    } else {
-        fail(i)
-    }
+    let (i, _) = tag_no_case(" triggered ")(i)?;
+    let (i, action) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
+    let (i, _) = tag_no_case(" against ")(i)?;
+    let (i, against) = user(i)?;
+
+    Ok((
+        i,
+        MessageType::InterPlayerAction {
+            from,
+            action: action.to_owned(),
+            against,
+        },
+    ))
 }
 
 fn ipv4_with_port(i: &str) -> IResult<&str, (Ipv4Addr, u16)> {
@@ -152,8 +150,11 @@ fn ipv4_with_port(i: &str) -> IResult<&str, (Ipv4Addr, u16)> {
 
 fn port(i: &str) -> IResult<&str, u16> {
     let (i, port) = digit1(i)?;
-    let port = port.parse::<u16>().map_err(|_| custom_err(i))?;
-    Ok((i, port))
+    if let Ok(port) = port.parse::<u16>() {
+        Ok((i, port))
+    } else {
+        fail(i)
+    }
 }
 
 fn ipv4(i: &str) -> IResult<&str, Ipv4Addr> {
