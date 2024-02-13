@@ -1,9 +1,11 @@
-use srcds_log_parser::LogMessage;
+use srcds_log_parser::{LogMessage, MessageType};
 
 use std::{env, net::UdpSocket};
 
 fn main() {
-    let port: u16 = env::args()
+    let mut args = env::args();
+    args.next();
+    let port: u16 = args
         .next()
         .and_then(|a| a.parse::<u16>().ok())
         .unwrap_or(9999);
@@ -21,6 +23,15 @@ fn main() {
                 continue;
             }
         };
-        println!("{:?}", message)
+        let mp = message.parse_message_type();
+        match mp {
+            MessageType::Unknown => {
+                println!("\nUNKNOWN\n{message:?}");
+            }
+            MessageType::Connected { .. } => {
+                panic!("CONNECT MESSAGE");
+            }
+            _ => (),
+        }
     }
 }

@@ -33,7 +33,7 @@ pub fn get_message_type(i: &str) -> IResult<&str, MessageType> {
         .parse(i)
 }
 
-fn rcon(i: &str) -> IResult<&str, MessageType> {
+pub fn rcon(i: &str) -> IResult<&str, MessageType> {
     let (i, _) = tag_no_case("rcon from ").parse(i)?;
     let (i, (ip, port)) = delimited(char('"'), ipv4_with_port, char('"'))(i)?;
     let (i, _) = tag(": command ")(i)?;
@@ -48,22 +48,22 @@ fn rcon(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn log_file_closed(i: &str) -> IResult<&str, MessageType> {
+pub fn log_file_closed(i: &str) -> IResult<&str, MessageType> {
     let _ = tag_no_case("log file closed")(i)?;
     Ok((i, MessageType::LogFileClosed))
 }
 
-fn server_cvars_start(i: &str) -> IResult<&str, MessageType> {
+pub fn server_cvars_start(i: &str) -> IResult<&str, MessageType> {
     let _ = tag_no_case("server cvars start")(i)?;
     Ok((i, MessageType::ServerCvarsStart))
 }
 
-fn server_cvars_end(i: &str) -> IResult<&str, MessageType> {
+pub fn server_cvars_end(i: &str) -> IResult<&str, MessageType> {
     let _ = tag_no_case("server cvars end")(i)?;
     Ok((i, MessageType::ServerCvarsEnd))
 }
 
-fn loading_map(i: &str) -> IResult<&str, MessageType> {
+pub fn loading_map(i: &str) -> IResult<&str, MessageType> {
     let (i, _) = tag("loading map ")(i)?;
     let (i, name) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
     Ok((
@@ -74,7 +74,7 @@ fn loading_map(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn starting_map(i: &str) -> IResult<&str, MessageType> {
+pub fn starting_map(i: &str) -> IResult<&str, MessageType> {
     let (i, _) = tag_no_case("started map ")(i)?;
     let (i, name) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
     let (i, _) = take_while(char::is_whitespace)(i)?;
@@ -88,7 +88,7 @@ fn starting_map(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn log_file_started(i: &str) -> IResult<&str, MessageType> {
+pub fn log_file_started(i: &str) -> IResult<&str, MessageType> {
     let (i, _) = tag_no_case("log file started ")(i)?;
     let (i, (_, file)) = kv_pair(i)?;
     let (i, _) = take_while1(char::is_whitespace)(i)?;
@@ -106,7 +106,7 @@ fn log_file_started(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
+pub fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
     delimited(
         char('('),
         |i: &'a str| {
@@ -121,7 +121,7 @@ fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
     .parse(i)
 }
 
-fn join_team_msg(i: &str) -> IResult<&str, MessageType> {
+pub fn join_team_msg(i: &str) -> IResult<&str, MessageType> {
     let (i, user) = user(i)?;
     let (i, _) = tag(" joined team ")(i)?;
     let (i, team) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
@@ -134,7 +134,7 @@ fn join_team_msg(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn inter_player_action(i: &str) -> IResult<&str, MessageType> {
+pub fn inter_player_action(i: &str) -> IResult<&str, MessageType> {
     let (i, from) = user(i)?;
     let (i, _) = tag_no_case(" triggered ")(i)?;
     let (i, action) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
@@ -151,11 +151,14 @@ fn inter_player_action(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn ipv4_with_port(i: &str) -> IResult<&str, (Ipv4Addr, u16)> {
-    (ipv4, port).parse(i)
+pub fn ipv4_with_port(i: &str) -> IResult<&str, (Ipv4Addr, u16)> {
+    let (i, ip) = ipv4(i)?;
+    let (i, _) = char(':')(i)?;
+    let (i, port) = port(i)?;
+    Ok((i, (ip, port)))
 }
 
-fn port(i: &str) -> IResult<&str, u16> {
+pub fn port(i: &str) -> IResult<&str, u16> {
     let (i, port) = digit1(i)?;
     if let Ok(port) = port.parse::<u16>() {
         Ok((i, port))
@@ -164,7 +167,7 @@ fn port(i: &str) -> IResult<&str, u16> {
     }
 }
 
-fn ipv4(i: &str) -> IResult<&str, Ipv4Addr> {
+pub fn ipv4(i: &str) -> IResult<&str, Ipv4Addr> {
     let (i, (a, _, b, _, c, _, d)) = (
         digit1,
         char('.'),
@@ -187,7 +190,7 @@ fn ipv4(i: &str) -> IResult<&str, Ipv4Addr> {
     ))
 }
 
-fn user(i: &str) -> IResult<&str, User> {
+pub fn user(i: &str) -> IResult<&str, User> {
     let re = Regex::new(r#""(.*?)<(\d+)><(\[U:\d:\d+\])><(\w*)?>""#).unwrap();
     let Some(caps) = re.captures(i) else {
         return Err(Err::Error(nom::error::Error::new(
@@ -213,7 +216,7 @@ fn user(i: &str) -> IResult<&str, User> {
     ))
 }
 
-fn disconnect_message(i: &str) -> IResult<&str, MessageType> {
+pub fn disconnect_message(i: &str) -> IResult<&str, MessageType> {
     let (i, user) = user(i)?;
     let (i, _) = tag(" disconnected (reason ")(i)?;
     let (i, reason) = delimited(char('"'), take_until1("\""), tag("\")")).parse(i)?;
@@ -226,14 +229,14 @@ fn disconnect_message(i: &str) -> IResult<&str, MessageType> {
     ))
 }
 
-fn connect_message(i: &str) -> IResult<&str, MessageType> {
+pub fn connect_message(i: &str) -> IResult<&str, MessageType> {
     let (i, user) = user(i)?;
     let (i, _) = tag(" connected, address ")(i)?;
     let (i, (ip, port)) = delimited(char('"'), ipv4_with_port, char('"')).parse(i)?;
     Ok((i, MessageType::Connected { user, ip, port }))
 }
 
-fn chat_message(i: &str) -> IResult<&str, MessageType> {
+pub fn chat_message(i: &str) -> IResult<&str, MessageType> {
     let (i, user) = user(i)?;
     let (i, say) = (tag(" say "), tag(" say_team ")).choice(i)?;
     let (i, message) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
@@ -250,14 +253,42 @@ fn chat_message(i: &str) -> IResult<&str, MessageType> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parser::message_type::get_message_type, MessageType};
+    use super::*;
+
+    #[test]
+    fn connect_message() {
+        const LINE: &str =
+            "\"User<1><[U:1:123456789]><>\" connected, address \"192.168.0.1:27005\"";
+        let parsed = get_message_type(LINE).unwrap();
+        dbg!(&parsed);
+        match parsed.1 {
+            MessageType::Connected { .. } => (),
+            _ => panic!("grr"),
+        }
+    }
+
+    #[test]
+    fn test_ipv4() {
+        const IP: &str = "192.168.0.225";
+        let ip: Ipv4Addr = ipv4(IP).unwrap().1;
+        dbg!(&ip);
+        assert!(ip.to_string() == "192.168.0.225");
+    }
+
+    #[test]
+    fn test_ipv4_with_port() {
+        const IP: &str = "192.168.0.115:12345";
+        let (ip, port) = ipv4_with_port(IP).unwrap().1;
+        dbg!(&ip);
+        assert!(ip.to_string() == "192.168.0.115");
+        assert!(port == 12345);
+    }
 
     #[test]
     fn start_map() {
         const LINE: &str =
             "Started map \"koth_highpass\" (CRC \"505b4fbf2a1661d2fb1b96f444ef268c\")";
         let parsed = get_message_type(LINE).unwrap();
-        dbg!(&parsed);
         assert!(
             parsed.1
                 == MessageType::StartedMap {
