@@ -77,6 +77,7 @@ fn loading_map(i: &str) -> IResult<&str, MessageType> {
 fn starting_map(i: &str) -> IResult<&str, MessageType> {
     let (i, _) = tag_no_case("started map ")(i)?;
     let (i, name) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
+    let (i, _) = take_while(char::is_whitespace)(i)?;
     let (i, (_, crc)) = kv_pair(i)?;
     Ok((
         i,
@@ -108,7 +109,13 @@ fn log_file_started(i: &str) -> IResult<&str, MessageType> {
 fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
     delimited(
         char('('),
-        |i: &'a str| (take_until(" "), take_until(")")).parse(i),
+        |i: &'a str| {
+            (
+                take_until(" "),
+                delimited(char('"'), take_until("\""), char('"')),
+            )
+                .parse(i)
+        },
         char(')'),
     )
     .parse(i)
@@ -117,7 +124,7 @@ fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
 fn join_team_msg(i: &str) -> IResult<&str, MessageType> {
     let (i, user) = user(i)?;
     let (i, _) = tag(" joined team ")(i)?;
-    let (i, (_, team, _)) = (char('"'), take_until1("\""), char('"')).parse(i)?;
+    let (i, team) = delimited(char('"'), take_until1("\""), char('"'))(i)?;
     Ok((
         i,
         MessageType::JoinedTeam {
@@ -239,4 +246,24 @@ fn chat_message(i: &str) -> IResult<&str, MessageType> {
             team: say == " say_team ",
         },
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{parser::message_type::get_message_type, MessageType};
+
+    #[test]
+    fn start_map() {
+        const LINE: &str =
+            "Started map \"koth_highpass\" (CRC \"505b4fbf2a1661d2fb1b96f444ef268c\")";
+        let parsed = get_message_type(LINE).unwrap();
+        dbg!(&parsed);
+        assert!(
+            parsed.1
+                == MessageType::StartedMap {
+                    name: "koth_highpass".to_owned(),
+                    crc: "505b4fbf2a1661d2fb1b96f444ef268c".to_owned()
+                }
+        );
+    }
 }
