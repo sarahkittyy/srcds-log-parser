@@ -1,4 +1,4 @@
-use srcds_log_parser::{LogMessage, LogParseError};
+use srcds_log_parser::LogMessage;
 
 use std::{env, net::UdpSocket};
 

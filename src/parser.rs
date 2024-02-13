@@ -1,8 +1,8 @@
 use chrono::{self, NaiveDateTime};
 use std::{fmt, str::FromStr};
 
-mod types;
-use types::MessageType;
+mod message_type;
+pub use message_type::{MessageType, User};
 
 const PACKET_HEADER: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
 const MAGIC_NOPASSWORD_BYTE: u8 = 0x52; // R
@@ -30,13 +30,11 @@ impl std::error::Error for LogParseError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogMessage {
     /// The raw timestamp at the start of the line
-    timestamp: NaiveDateTime,
+    pub timestamp: NaiveDateTime,
     /// The raw string message with timestamps and headers removed.
-    message: String,
-    /// The parsed HL message type https://developer.valvesoftware.com/wiki/HL_Log_Standard
-    message_type: MessageType,
+    pub message: String,
     /// If sv_logsecret is set on the server and this log was received over UDP, this will be the received secret
-    secret: Option<String>,
+    pub secret: Option<String>,
 }
 
 impl FromStr for LogMessage {
@@ -95,10 +93,13 @@ impl LogMessage {
 
         Ok(Self {
             timestamp,
-            message_type: MessageType::from_message(message.as_str()),
             message,
             secret,
         })
+    }
+
+    pub fn parse_message_type(&self) -> MessageType {
+        MessageType::from_message(self.message.as_str())
     }
 }
 
@@ -109,7 +110,7 @@ mod tests {
     #[test]
     fn simple_log_line() {
         const LINE: &str = &"L 02/09/2024 - 08:00:50: \"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\"";
-        let parsed = LogMessage::from_bytes(LINE.as_bytes()).unwrap();
+        let parsed = LogMessage::from_str(LINE).unwrap();
         assert!(
             parsed.message
                 == "\"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\""
@@ -120,7 +121,7 @@ mod tests {
     #[test]
     fn no_password() {
         const LINE: &str = &"RL 02/09/2024 - 08:00:50: \"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\"";
-        let parsed = LogMessage::from_bytes(LINE.as_bytes()).unwrap();
+        let parsed = LogMessage::from_str(LINE).unwrap();
         assert!(
             parsed.message
                 == "\"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\""
@@ -131,7 +132,7 @@ mod tests {
     #[test]
     fn with_password() {
         const LINE: &str = &"SnyaL 02/09/2024 - 08:00:50: \"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\"";
-        let parsed = LogMessage::from_bytes(LINE.as_bytes()).unwrap();
+        let parsed = LogMessage::from_str(LINE).unwrap();
         assert!(
             parsed.message
                 == "\"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\""
@@ -155,7 +156,7 @@ mod tests {
     #[test]
     fn bad_format() {
         const LINE: &str = &"KmeowL 02/09/2024 - 08:00:50: \"TheirUsername<6><[U:1:1324124512]><>\" connected, address \"192.168.0.1\"";
-        let parsed = LogMessage::from_bytes(LINE.as_bytes());
+        let parsed = LogMessage::from_str(LINE);
         assert!(parsed.is_err_and(|e| e == LogParseError::BadPasswordByte(75)));
     }
 
