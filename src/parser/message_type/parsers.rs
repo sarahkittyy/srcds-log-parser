@@ -112,7 +112,7 @@ fn kv_pair<'a>(i: &'a str) -> IResult<&'a str, (&'a str, &'a str)> {
         |i: &'a str| {
             (
                 take_until(" "),
-                delimited(char('"'), take_until("\""), char('"')),
+                preceded(char(' '), delimited(char('"'), take_until("\""), char('"'))),
             )
                 .parse(i)
         },
